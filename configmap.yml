@@ -6,7 +6,7 @@ metadata:
 data:
  Game.ini: |
     [/Script/Engine.GameSession]
-    MaxPlayers=${PLAYER_COUNT}
+    MaxPlayers=${COUNT}
 
 #   Engine.ini: |
 #     ;METADATA=(Diff=true, UseCommands=true)

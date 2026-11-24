@@ -1,64 +1,39 @@
-# Satisfactory game server
-This project was formed while I study for the CKA. My goal was to not use Ai at all but only the [k8s docs](https://kubernetes.io/docs/home/) and the [Satisfactory wiki](https://satisfactory.wiki.gg/wiki/Dedicated_servers) when writing all this code. I hope to add to this as time allows.
-
-Satifactory needs a cpu with good single core performance: [Requirements](https://satisfactory.wiki.gg/wiki/Dedicated_servers#Requirements). I have set resource limits/requests to met these requirements and have not seen any performance issues in the 160+ hours of play with 3 other people. For context my VMhost's CPU is a Ryzen 3900x with 64GB of ram.
-
-That said. This is how I deployed a base Satisfactory game server into my kubernetes cluster.
-
-## How I setup my cluster ##
-My current cluster is a 3 node k8s cluster that was deployed via kubeadm, but should work in any type of cluster as long as you have enough resources on your worker nodes.
+# Satisfactory dedicated server kubernetes deployment
 
 
-  1. I deployed 1 control node and 3 worker nodes(all Ubuntu Server 24.04) as VMs in proxmox and my synology NAS. I put my control node and 1 working node on my synology for lighter workloads (2 vCPU, 4 GB ram) and the other 2 nodes in proxmox (4 vCPU 12 GB ram). I used my [ansible playbook](https://github.com/ChrisZ-IT/initial_k8s_node_prep) to prep each node. Then used kubeadm init per [k8s docs](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/) to setup my cluster.
+## deployment
 
-  2. Installed Calico as my K8s CNI
+  1. Clone this project down and CD into that directory
+  3. Make any necessary changes (examples: change configmap(Other server settings), pv and pvcs..etc)
+  4. Deploy the server resources(This assumes you have `envsubst` installed):
+      - Run `./deploy.sh` within the Satisfactory directory within this project.
+  5. Verify pod starts:
+    - `k get pod -n satisfactory`
 
-  3. Deployed MetalLB as my cluster loadbalancer([Example of how I set these up](https://github.com/ChrisZ-IT/base_k8s_deployment))
+Note: To patch server just restart the pod.
 
-  4. Deployed [cert manager](https://github.com/ChrisZ-IT/cert-manager) (this is optional, but you will need to comment out certificate.yml, and the attached tls volumes/secrets in the deployment before applying)
+## Troubleshooting
+  - Verify the pod:
+    - `k get pod -n satisfactory`
+    - `k describe pod -n satisfactory`
+      - review the events on the pod
 
-  4. Setup an NFS share on my synology and allow each of my k8s nodes to be able to connect to it.
-     - I have volume snapshots and file level backups setup on my synology for backing up my persistent volume data
+  - Review pods app logs
+    - Review init container logs: `k logs -n satisfactory pods/satisfactory-66574f9b8c-tfj25 init-steamcmd --follow`
+      - is it having issues downloading the game files?
+    - Review main container logs: `k logs -n satisfactory pods/satisfactory-66574f9b8c-tfj25 satisfactory-server --follow`
+      - Is it having issues starting the server?
 
+  - Verify storage is bound:
+    - `k get pv -n satisfactory`
+    - `k get pvc -n satisfactory`
 
-## Satisfactory deployment
+  - Verify storage permissions:
+    - If pod wont start or you are getting `permission denied` errors and you are using nfs as your persistent storage.
+      - validate 1026:100 has 755 permissions to your nfs mounts. You may have to exec into the pod or set it from the storage side.
 
-  1. Add the label `requiredCPU=high` to the worker node(s) you want allow this pod to go on `kubectl label nodes kubewrk01 kubewrk02 requiredCPU=high`
-  2. Create the satisfactory namespace `kubectl create ns satisfactory`
-  3. Clone this project down and CD into that directory
-  4. Make any necessary changes (examples: change loadbalancer, storage paths..etc )
-  5. Deploy resources:
-    - this block assumes you have `envsubst` installed.
-        ```
-          read -p "Enter Domain(for your cert): " domainname
-          if [[ -z "$domainname" ]]; then
-            echo "domain is blank, Did you comment out all certificate related resources?"
-            read -p "Press enter to continue"
-          fi
-          read -p "Enter Player Count up to 127(4): " playercount
-          playercount=${playercount:-4}
-
-          export DOMAIN_NAME=$domainname
-          export PLAYER_COUNT=$playercount
-          if [ -f "namespace.yml" ]; then
-            echo "Applying namespace.yml..."
-            kubectl apply -f namespace.yml
-          fi
-          for file in *.yml; do
-            [ -e "$file" ] || continue
-            echo "Applying $file..."
-            envsubst < "$file" | kubectl apply -f -
-          done
-        ```
-  6. Validate your deployment `kubectl get all -n satisfactory`
-    - Validate storage is bound
-    - Validate the svc has registered the pod (endpoints)
-    - Validate the pod has started
-      - View logs:
-        - init container logs example:  `k logs -n satisfactory pods/satisfactory-665b54f567-zt6dx init-steamcmd --follow`
-        - Main server container logs example:  `k logs -n satisfactory pods/satisfactory-665b54f567-zt6dx satisfactory --follow`
-  7. At this point you should be able to start playing your new server. Setup any port forwards on your router to your LoadBalancer's external IP to allow external people to be able to join your server.
-  8. Ensure you claim your server and setup the admin password from within the game.
+  - Verify the service has an endpoint
+    - `k describe svc -n satisfactory satisfactory-svc`
 
 ## TODO
   1. Setup network policies to further lock down who can connect to this server(already doing this via my firewall).

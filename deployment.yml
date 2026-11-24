@@ -39,19 +39,19 @@ spec:
       initContainers:
       - name: init-steamcmd
         image: docker.io/steamcmd/steamcmd:ubuntu
-        imagePullPolicy: IfNotPresent
-        command: ['sh', '-c', 'steamcmd +force_install_dir /home/ubuntu/satisfactory +login anonymous +app_update 1690800 validate +quit && chown -R 1000:1000 /home/ubuntu']
+        imagePullPolicy: Always
+        command: ['sh', '-c', 'steamcmd +force_install_dir /home/ubuntu/satisfactory-server +login anonymous +app_update 1690800 validate +quit && chown -R 1000:1000 /home/ubuntu']
         securityContext:
           allowPrivilegeEscalation: true
         volumeMounts:
         - name: satisfactory-gamefiles-volume
-          mountPath: /home/ubuntu/satisfactory
+          mountPath: /home/ubuntu/satisfactory-server
         - name: satisfactory-configs-volume
           mountPath: /home/ubuntu/.config
       containers:
       - name: satisfactory
         image: docker.io/ubuntu:26.04
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         securityContext:
           runAsUser: 1000
           runAsGroup: 1000
@@ -72,20 +72,20 @@ spec:
         - containerPort: 8888
           name: 8888-tcp
           protocol: TCP
-        command: ['sh', '-c', '/home/ubuntu/satisfactory/FactoryServer.sh']
+        command: ['sh', '-c', '/home/ubuntu/satisfactory-server/FactoryServer.sh']
         volumeMounts:
         - name: satisfactory-gamefiles-volume
-          mountPath: /home/ubuntu/satisfactory
+          mountPath: /home/ubuntu/satisfactory-server
         - name: satisfactory-configs-volume
           mountPath: /home/ubuntu/.config
         - name: satisfactory-server-configs
-          mountPath: home/ubuntu/satisfactory/FactoryGame/Saved/Config/LinuxServer/Game.ini
+          mountPath: /home/ubuntu/satisfactory-server/FactoryGame/Saved/Config/LinuxServer/Game.ini
           subPath: Game.ini
         - name: satisfactory-cert
-          mountPath: home/ubuntu/satisfactory/FactoryGame/Certificates/cert_chain.pem
+          mountPath: /home/ubuntu/satisfactory/FactoryGame/Certificates/cert_chain.pem
           subPath: tls.crt
         - name: satisfactory-key
-          mountPath: home/ubuntu/satisfactory/FactoryGame/Certificates/private_key.pem
+          mountPath: /home/ubuntu/satisfactory/FactoryGame/Certificates/private_key.pem
           subPath: tls.key
         # - name: satisfactory-server-configs
         #   mountPath: home/ubuntu/satisfactory/FactoryGame/Saved/Config/LinuxServer/Engine.ini
